@@ -1,0 +1,67 @@
+version: "3.9"
+
+services:
+  backend:
+    image: hakush1n/nta_backend:latest
+    container_name: backend_api
+    ports:
+      - "5000:5000"
+    environment:
+      # SQL
+      - ConnectionStrings__DefaultConnection=${DEFAULT_CONNECTION}
+
+      # MinIO
+      - MinIO__Endpoint=${MINIO_ENDPOINT}
+      - MinIO__AccessKey=${MINIO_USER}
+      - MinIO__SecretKey=${MINIO_PASSWORD}
+
+      # JWT
+      - Jwt__Issuer=${JWT_ISSUER}
+      - Jwt__Audience=${JWT_AUDIENCE}
+      - Jwt__Key=${JWT_KEY}
+    depends_on:
+      - sqlserver
+      - minio
+    restart: always
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    container_name: backend-sqlserver
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=${SA_PASSWORD}
+      - MSSQL_PID=Developer
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    restart: always
+
+  minio:
+    image: minio/minio:RELEASE.2024-04-18T19-09-19Z
+    container_name: minio_server
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - ./storage:/data
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD}
+    command: server --console-address ":9001" /data
+    restart: always
+
+  frontend:
+    image: hakush1n/nta_frontend:latest
+    container_name: frontend_web
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_BASE_URL=http://backend:5000
+      - NEXT_PUBLIC_MINIO_API_BASE_URL=http://minio:9000
+    depends_on:
+      - backend
+    restart: always
+
+volumes:
+  sqlserver_data:
